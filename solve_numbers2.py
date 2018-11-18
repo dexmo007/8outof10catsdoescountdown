@@ -44,6 +44,27 @@ def calculate(e):
         raise f'Invalid equation {stack}'
     return stack[0]
 
+def calculate_fast(e):
+    stack = []
+    for i in range(len(e)):
+        el = e[i]
+        if callable(el):
+            r = stack.pop()
+            l = stack.pop()
+            res = el(l, r)
+            if res == l:
+                raise 'Identity operations are redundant'
+            if res == 0:
+                raise 'Zeros are redundant'
+            if res < 0:
+                raise 'No negs allowed'
+            if is_float(res):
+                raise 'Floating points are not allowed'
+            stack.append(res)
+        else:
+            stack.append(el)
+    return stack[0]
+
 def ocs(j, n, total_ops):
     if n == total_ops:
         return list(map(lambda x: x[0],filter(lambda x: x[1] == 2, j)))
@@ -69,7 +90,6 @@ def get_map_entries(total_ops):
                     map_entry.append(0)
         _map.append(map_entry)
     return _map
-#equation = [1,2,4,operator.add,3,3,operator.mul, operator.add, operator.mul]
 
 def build_equation(map_entry, numbers, op_stack):
     equation = []
@@ -81,6 +101,26 @@ def build_equation(map_entry, numbers, op_stack):
             equation.append(op_stack.pop())
     return equation
 
+def calculate_direct(map_entry, numbers, op_stack):
+    stack = []
+    i_numbers = 0
+    i_op_stack = 0
+    for rule in map_entry:
+        if rule > 0:
+            for _ in range(rule):
+                stack.append(numbers[i_numbers])
+                i_numbers += 1
+        else:
+            op = op_stack[i_op_stack]
+            i_op_stack += 1
+            r = stack.pop()
+            l = stack.pop()
+            res = op(l, r)
+            if res == l or res <= 0 or is_float(res):
+                return False
+            stack.append(res)
+    return (True, stack[0])
+
 start = time.time()
 i = 0
 solutions = []
@@ -91,15 +131,14 @@ for k in range(2, len(tiles) + 1):
             for map_entry in map_entries:
                 for op_stack in itertools.product(ops.keys(), repeat=k - 1):
                     i = i + 1
-                    equation = build_equation(map_entry, list(permutation), list(op_stack))
                     try:
-                        res, eqrepr = calculate(equation)
-                        if res == target:
-                            solutions.append(eqrepr)
+                        success, res = calculate_direct(map_entry, permutation, op_stack)
+                        if success and res == target:
+                            solutions.append(build_equation(map_entry, list(permutation), list(op_stack)))
                     except:
                         pass
                     
-for solution in solutions:
-    print(solution)
+#for solution in solutions:
+#    print(solution)
 print(f'Tested {i} combinations in {time.time() - start}')
 print(f'Found {len(solutions)} solutions')
