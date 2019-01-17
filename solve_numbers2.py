@@ -3,6 +3,8 @@ import sys
 import itertools
 import operator
 import time
+from multiprocessing import Process
+from multiprocessing import Queue
 
 tiles = []
 for ns in sys.argv[1].split(','):
@@ -121,24 +123,38 @@ def calculate_direct(map_entry, numbers, op_stack):
             stack.append(res)
     return (True, stack[0])
 
-start = time.time()
-i = 0
-solutions = []
-for k in range(2, len(tiles) + 1):
+
+def solve_k(k, out):
     map_entries = get_map_entries(k - 1)
+    op_stacks = list(itertools.product(ops.keys(), repeat=k - 1))
+    solutions = []
     for combination in itertools.combinations(tiles, k):
         for permutation in itertools.permutations(combination):
             for map_entry in map_entries:
-                for op_stack in itertools.product(ops.keys(), repeat=k - 1):
-                    i = i + 1
+                for op_stack in op_stacks:
                     try:
                         success, res = calculate_direct(map_entry, permutation, op_stack)
                         if success and res == target:
                             solutions.append(build_equation(map_entry, list(permutation), list(op_stack)))
                     except:
                         pass
+    out.put(solutions)
+
+
+start = time.time()
+output = Queue()
+processes = [Process(target=solve_k, args=(k, output)) for k in range(2, len(tiles) + 1)]
+for p in processes:
+    p.start()
+
+for p in processes:
+    p.join()
+
+solutions = []
+for _ in processes:
+    solutions.extend(output.get())
                     
 #for solution in solutions:
 #    print(solution)
-print(f'Tested {i} combinations in {time.time() - start}')
+print(f'Tested all combinations in {time.time() - start}')
 print(f'Found {len(solutions)} solutions')
